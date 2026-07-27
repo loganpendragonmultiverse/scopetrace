@@ -1,20 +1,18 @@
 {
-    "evidence":  [
-                     {
-                         "reference":  "src/export.py",
-                         "requirement":  "REQ-1",
-                         "state":  "implemented"
-                     },
-                     {
-                         "reference":  "tests/test_export.py",
-                         "requirement":  "REQ-1",
-                         "state":  "verified"
-                     }
-                 ],
-    "requirements":  [
-                         {
-                             "id":  "REQ-1",
-                             "text":  "Export JSON"
-                         }
-                     ]
+  "as_of": "2026-07-27",
+  "requirements": [
+    {
+      "id": "REQ-1",
+      "text": "Export valid JSON",
+      "acceptance_criteria": [{"id": "AC-1", "text": "Output parses as JSON"}]
+    }
+  ],
+  "evidence": [
+    {"id": "E-1", "requirement": "REQ-1", "state": "implemented", "reference": "src/export.py", "observed_at": "2026-07-27"},
+    {"id": "E-2", "requirement": "REQ-1", "state": "merged", "reference": "commit:abc", "observed_at": "2026-07-27"},
+    {"id": "E-3", "requirement": "REQ-1", "state": "configured", "reference": "pyproject.toml", "observed_at": "2026-07-27"},
+    {"id": "E-4", "requirement": "REQ-1", "state": "deployed", "reference": "release:v1.1.0", "observed_at": "2026-07-27"},
+    {"id": "E-5", "requirement": "REQ-1", "state": "verified", "reference": "tests/test_export.py", "observed_at": "2026-07-27"},
+    {"id": "E-6", "requirement": "REQ-1", "criterion": "AC-1", "state": "verified", "reference": "test-json-parse", "observed_at": "2026-07-27"}
+  ]
 }
