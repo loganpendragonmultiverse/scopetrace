@@ -5,21 +5,22 @@ import json
 import sys
 from pathlib import Path
 
-from .core import analyze, render_json, render_markdown
+from .core import analyze, render_csv, render_json, render_markdown
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        description="Generate a deterministic, reviewable report from explicit JSON input."
-    )
+    parser = argparse.ArgumentParser(description="Build an evidence-gated delivery matrix.")
     parser.add_argument("input", type=Path, help="UTF-8 JSON input file")
-    parser.add_argument("--format", choices=("markdown", "json"), default="markdown")
+    parser.add_argument("--format", choices=("markdown", "json", "csv"), default="markdown")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args(argv)
     try:
-        data = json.loads(args.input.read_text(encoding="utf-8"))
-        report = analyze(data)
-        rendered = render_json(report) if args.format == "json" else render_markdown(report)
+        report = analyze(json.loads(args.input.read_text(encoding="utf-8")))
+        rendered = {
+            "json": render_json,
+            "markdown": render_markdown,
+            "csv": render_csv,
+        }[args.format](report)
         if args.output:
             if args.output.exists():
                 raise ValueError(f"output already exists: {args.output}")
