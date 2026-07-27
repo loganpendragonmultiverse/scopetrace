@@ -1,0 +1,20 @@
+{
+    "evidence":  [
+                     {
+                         "reference":  "src/export.py",
+                         "requirement":  "REQ-1",
+                         "state":  "implemented"
+                     },
+                     {
+                         "reference":  "tests/test_export.py",
+                         "requirement":  "REQ-1",
+                         "state":  "verified"
+                     }
+                 ],
+    "requirements":  [
+                         {
+                             "id":  "REQ-1",
+                             "text":  "Export JSON"
+                         }
+                     ]
+}
