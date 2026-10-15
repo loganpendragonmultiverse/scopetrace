@@ -229,6 +229,8 @@ def _scopetrace(data: dict[str, Any], *, explain_blockers: bool = False) -> dict
             "missing_transition_evidence": missing,
             "blocked_by": [],
         }
+        # Explanations belong to this report, never to caller-supplied requirement data.
+        row.pop("blocker_explanations", None)
         rows.append(row)
         by_id[requirement["id"]] = row
     intrinsic = {identifier: bool(row["verified"]) for identifier, row in by_id.items()}

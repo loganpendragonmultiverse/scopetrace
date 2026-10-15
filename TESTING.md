@@ -37,3 +37,6 @@ fetch or execute evidence references.
 
 - The explanation budget is shared by the entire report, fails before an output is
   written, and does not limit ordinary reports.
+
+- Caller-supplied blocker explanations are ignored in default and opt-in reports;
+  mixed rows render safely and fresh evidence-derived causes replace stale data.

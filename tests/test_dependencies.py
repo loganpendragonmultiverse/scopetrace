@@ -247,3 +247,39 @@ def test_explanation_budget_is_report_wide_and_never_changes_default_results(
     )
     assert "path limit" in capsys.readouterr().err
     assert not output.exists()
+
+
+@pytest.mark.parametrize("supplied", [[], [{"path": ["OLD"]}], None, "stale"])
+@pytest.mark.parametrize("mixed", [False, True])
+def test_caller_explanations_are_output_owned(supplied, mixed):
+    requirements = [{"id": "A", "blocker_explanations": supplied}]
+    if mixed:
+        requirements.append({"id": "B"})
+    data = model(requirements, [])
+    original = deepcopy(data)
+    default = analyze(data)
+    assert all("blocker_explanations" not in row for row in default["requirements"])
+    assert "Blocking explanations" not in render_markdown(default)
+    assert "No blocking causes." not in render_markdown(default)
+    explained = analyze(data, explain_blockers=True)
+    for row in explained["requirements"]:
+        assert row["blocker_explanations"] == [
+            {
+                "path": [row["id"]],
+                "requirement": row["id"],
+                "missing_transition_evidence": ["implemented"],
+                "unsatisfied_acceptance_criteria": [],
+            }
+        ]
+    markdown = render_markdown(explained)
+    assert "Blocking explanations" in markdown
+    assert "No blocking causes." not in markdown
+    assert "OLD" not in markdown
+    assert data == original
+
+
+def test_supplied_explanations_do_not_override_verified_result():
+    data = model([{"id": "A", "blocker_explanations": [{"path": ["OLD"]}]}], evidence_for("A"))
+    report = analyze(data, explain_blockers=True)
+    assert report["requirements"][0]["blocker_explanations"] == []
+    assert "No blocking causes." in render_markdown(report)
