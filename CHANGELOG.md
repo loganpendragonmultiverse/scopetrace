@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.0 - 2026-10-15
+
+- Evaluate dependency verification independently of requirement order and reject dependency cycles.
+- Add opt-in causal blocker explanations with shortest paths and deterministic tie breaking in JSON and Markdown.
+- Preserve input row order and default report fields/CSV columns; reject CSV plus explanations explicitly.
+
 ## 1.1.0 - 2026-07-27
 
 - Added evidence provenance IDs, pass/fail/superseded status, observation and expiration dates, and stale-evidence handling.

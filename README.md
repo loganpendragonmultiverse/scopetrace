@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/loganpendragonmultiverse/scopetrace/actions/workflows/ci.yml/badge.svg)](https://github.com/loganpendragonmultiverse/scopetrace/actions/workflows/ci.yml)
 
-Turn requirements, acceptance criteria, dependencies, and supplied evidence into a conservative delivery-state matrix. Version 1.1 prevents a high-level claim from skipping the implementation, merge, configuration, deployment, or verification evidence beneath it.
+Turn requirements, acceptance criteria, dependencies, and supplied evidence into a conservative delivery-state matrix. Version 1.2 evaluates dependencies independently of row order while preserving the contiguous implementation, merge, configuration, deployment and verification evidence gates.
 
 ## Three-minute start
 
@@ -38,3 +38,36 @@ python -m build
 ```
 
 Part of the [Logan Pendragon Forge open-source collection](https://www.loganpendragonforge.com/open-source/). Licensed under the [MIT License](LICENSE).
+
+## Dependency blockers
+
+Dependencies are evaluated before the requirements that depend on them. Reordering
+requirements does not change verification results, and dependency cycles are rejected.
+Reports keep the input row order. A row's delivery state describes its own evidence;
+its verified flag also requires every dependency to be verified.
+
+For a causal explanation, request JSON or Markdown:
+
+```bash
+scopetrace examples/sample.json --explain-blockers --format json
+scopetrace examples/sample.json --explain-blockers
+```
+
+Each row then includes blocker_explanations. A cause identifies a requirement
+missing its own evidence or acceptance criteria, a path to that requirement, the
+first missing delivery transition, and unsatisfied criterion IDs. A path containing
+only the row itself explains missing evidence on that row. Verified rows have no
+causes. Direct unverified dependencies remain in blocked_by.
+
+If several paths lead to the same cause, the report includes one shortest path.
+Equal-length paths use lexicographic requirement-ID order. This avoids listing every
+path through a diamond-shaped graph. Explanations do not fetch references, establish
+their truth, or change the existing treatment of failed, superseded and stale evidence.
+
+The Python API accepts analyze(data, explain_blockers=True). The option is off by
+default; ordinary JSON fields, Markdown and CSV columns retain their existing shape.
+The CLI rejects --explain-blockers with CSV rather than dropping the explanations.
+
+Explanations are bounded to 100,000 requirement-ID occurrences across all paths in
+one report. Exceeding this limit fails before an output file is written; run without
+the option or select a smaller input. Default reports do not use this path budget.
