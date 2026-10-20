@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import html
 import io
 import json
 import re
@@ -44,14 +45,23 @@ def _validate_requirements(requirements: Any) -> tuple[list[dict[str, Any]], set
             not isinstance(dependency, str) or not dependency for dependency in dependencies
         ):
             raise ValueError("depends_on must be a list of requirement ids")
-        links = [item.get("parent"), *dependencies]
+        parent = item.get("parent")
+        if parent is not None and not isinstance(parent, str):
+            raise ValueError("parent must be a requirement id")
+        links = [parent, *dependencies]
         if any(link and link not in known for link in links):
             raise ValueError("requirement hierarchy references an unknown id")
+        if "text" in item and not isinstance(item["text"], str):
+            raise ValueError("requirement text must be a string")
         criteria = item.get("acceptance_criteria", [])
+        if not isinstance(criteria, list):
+            raise TypeError("acceptance criteria need a list of objects")
         criterion_ids = [
             criterion.get("id") for criterion in criteria if isinstance(criterion, dict)
         ]
-        if len(criterion_ids) != len(criteria) or any(not value for value in criterion_ids):
+        if len(criterion_ids) != len(criteria) or any(
+            not isinstance(value, str) or not value for value in criterion_ids
+        ):
             raise ValueError("acceptance criteria need non-empty ids")
         if len(criterion_ids) != len(set(criterion_ids)):
             raise ValueError("acceptance criteria ids must be unique within a requirement")
@@ -133,13 +143,22 @@ def _normalize_evidence(
 ) -> tuple[list[dict[str, Any]], list[str]]:
     if not isinstance(items, list) or any(not isinstance(item, dict) for item in items):
         raise ValueError("evidence must be a list of objects")
+    for item in items:
+        if not isinstance(item.get("requirement"), str) or not item["requirement"]:
+            raise ValueError("evidence requirement must be a nonempty id")
+        if "criterion" in item and (
+            not isinstance(item["criterion"], str) or not item["criterion"]
+        ):
+            raise ValueError("evidence criterion must be a nonempty id")
     unknown = sorted(
         {str(item.get("requirement")) for item in items if item.get("requirement") not in known}
     )
     normalized: list[dict[str, Any]] = []
     evidence_ids: set[str] = set()
     for index, item in enumerate(items, 1):
-        evidence_id = str(item.get("id", f"EVID-{index}"))
+        evidence_id = item.get("id", f"EVID-{index}")
+        if not isinstance(evidence_id, str) or not evidence_id:
+            raise ValueError("evidence ids must be nonempty strings")
         if evidence_id in evidence_ids:
             raise ValueError("evidence ids must be unique")
         evidence_ids.add(evidence_id)
@@ -147,13 +166,17 @@ def _normalize_evidence(
         if state not in STATES[1:]:
             raise ValueError("evidence contains an invalid state")
         status = item.get("status", "pass")
-        if status not in {"pass", "fail", "superseded"}:
+        if not isinstance(status, str) or status not in {"pass", "fail", "superseded"}:
             raise ValueError("evidence contains an invalid status")
         observed = _day(str(item.get("observed_at", as_of.isoformat())), "observed_at")
         expires = _day(str(item["expires_at"]), "expires_at") if item.get("expires_at") else None
+        record = dict(item)
+        record.pop("future", None)
+        if observed > as_of:
+            record["future"] = True
         normalized.append(
             {
-                **item,
+                **record,
                 "id": evidence_id,
                 "observed_at": observed.isoformat(),
                 "status": status,
@@ -167,7 +190,10 @@ def _supported_state(evidence: list[dict[str, Any]]) -> tuple[str, list[str]]:
     passing = {
         item["state"]
         for item in evidence
-        if item["status"] == "pass" and not item["stale"] and not item.get("criterion")
+        if item["status"] == "pass"
+        and not item["stale"]
+        and not item.get("future")
+        and not item.get("criterion")
     }
     supported = "unstarted"
     missing: list[str] = []
@@ -204,13 +230,16 @@ def _scopetrace(data: dict[str, Any], *, explain_blockers: bool = False) -> dict
                         item["state"] == "verified"
                         and item["status"] == "pass"
                         and not item["stale"]
+                        and not item.get("future")
                         for item in matches
                     ),
                     "evidence": matches,
                 }
             )
         failed = [
-            item for item in requirement_evidence if item["status"] == "fail" and not item["stale"]
+            item
+            for item in requirement_evidence
+            if item["status"] == "fail" and not item["stale"] and not item.get("future")
         ]
         stale = [item["id"] for item in requirement_evidence if item["stale"]]
         row = {
@@ -254,6 +283,15 @@ def _scopetrace(data: dict[str, Any], *, explain_blockers: bool = False) -> dict
                 )
                 row["blocker_explanations"] = explanations
     previous = data.get("previous", {})
+    if not isinstance(previous, dict) or not isinstance(previous.get("requirements", []), list):
+        raise TypeError("previous must be a report with a requirements list")
+    previous_ids = set()
+    for item in previous.get("requirements", []):
+        if not isinstance(item, dict) or not isinstance(item.get("id"), str) or not item["id"]:
+            raise ValueError("previous requirements need nonempty ids")
+        if item["id"] in previous_ids or item.get("state", "unstarted") not in STATES:
+            raise ValueError("previous requirements need unique ids and valid states")
+        previous_ids.add(item["id"])
     old_states = {
         item["id"]: item.get("state", "unstarted") for item in previous.get("requirements", [])
     }
@@ -284,6 +322,8 @@ def _scopetrace(data: dict[str, Any], *, explain_blockers: bool = False) -> dict
 
 
 def analyze(data: dict[str, Any], *, explain_blockers: bool = False) -> dict[str, Any]:
+    if not isinstance(data, dict):
+        raise TypeError("input must be a JSON object")
     return {
         "schema_version": SCHEMA_VERSION,
         "project": PROJECT,
@@ -303,6 +343,10 @@ def _code_span(value: str) -> str:
 
 
 def render_markdown(report: dict[str, Any]) -> str:
+    def cell(value: str) -> str:
+        literal = re.sub(r"([\\`*_{}\[\]()!~])", r"\\\1", html.escape(value))
+        return literal.replace("|", "&#124;").replace("\r", " ").replace("\n", " ")
+
     lines = [
         "# ScopeTrace delivery matrix",
         "",
@@ -311,8 +355,8 @@ def render_markdown(report: dict[str, Any]) -> str:
     ]
     for row in report["requirements"]:
         lines.append(
-            f"| {row['id']} — {row.get('text', '')} | {row['state']} | "
-            f"{'yes' if row['verified'] else 'no'} | {', '.join(row['blocked_by'])} |"
+            f"| {cell(row['id'])} — {cell(row.get('text', ''))} | {row['state']} | "
+            f"{'yes' if row['verified'] else 'no'} | {cell(', '.join(row['blocked_by']))} |"
         )
     lines += ["", "## Summary", "", f"```json\n{json.dumps(report['summary'], indent=2)}\n```", ""]
     if any("blocker_explanations" in row for row in report["requirements"]):
