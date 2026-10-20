@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 from pathlib import Path
 
+from ._io import load_json, preflight, write_new
 from .core import analyze, render_csv, render_json, render_markdown
 
 
@@ -23,7 +23,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.explain_blockers and args.format == "csv":
             raise ValueError("blocker explanations require JSON or Markdown output")
         report = analyze(
-            json.loads(args.input.read_text(encoding="utf-8")),
+            load_json(args.input),
             explain_blockers=args.explain_blockers,
         )
         rendered = {
@@ -32,12 +32,11 @@ def main(argv: list[str] | None = None) -> int:
             "csv": render_csv,
         }[args.format](report)
         if args.output:
-            if args.output.exists():
-                raise ValueError(f"output already exists: {args.output}")
-            args.output.write_text(rendered, encoding="utf-8")
+            preflight([args.output])
+            write_new(args.output, rendered)
         else:
             sys.stdout.write(rendered)
-    except (OSError, UnicodeError, ValueError, json.JSONDecodeError) as exc:
+    except (OSError, UnicodeError, TypeError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
     return 0

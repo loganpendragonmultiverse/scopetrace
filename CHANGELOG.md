@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.2.1 - 2026-10-20
+
+- Keep future-dated evidence visible but ineligible at the requested as-of date.
+- Validate malformed model/previous/evidence shapes and bounded, unambiguous JSON inputs.
+- Preserve competing report files with exclusive publication and escape literal Markdown matrix cells.
+- Include development/testing handoffs in source distributions.
+
+JSON inputs reject nesting beyond 128 containers with an actionable error, including parser recursion failures.
+
+- Install the synthetic example with the wheel as well as the source distribution.
+
+- Reject JSON numeric overflow while preserving finite fractions.
+
 ## 1.2.0 - 2026-10-15
 
 - Evaluate dependency verification independently of requirement order and reject dependency cycles.
